@@ -1,0 +1,171 @@
+---
+Title : "Reproducible Research: Peer Assessment 1"
+Author: zhimao
+Date: June 5 2016
+output: 
+  html_document:
+    keep_md: true
+---
+
+### Introduction 
+This is the project for "Reproducible Research: Peer Assessment 1". 
+
+You can find detials on the README file.
+
+We will go through the questions and answer them accordlingly.
+
+### Project details 
+#### Loading and preprocessing the data
+
+Code for reading in the dataset and/or processing the data Loading and preprocessing the data
+```{r Read the csv data file, echo=TRUE}
+activityData <- read.csv("./activity.csv", skip = 1, sep = ",", col.names = c("Steps", "Date", "Interval"))
+```
+
+#### Histogram of the total number of steps taken each day
+```{r Hitogram of total number of steps taken each day, echo=TRUE}
+totalStepsByDay <- aggregate(Steps ~ Date, activityData, sum, na.rm = TRUE)
+
+hist(totalStepsByDay$Steps, xlab = "Total steps taken each day", main = "Histogram of total steps take each day")
+```
+
+#### Mean and median number of steps taken each day
+
+##### Mean number of steps taken each day
+```{r Mean number of steps taken each day, echo=TRUE}
+meanNumberStepsByDay <- aggregate(Steps ~ Date, activityData, mean, na.rm = TRUE)
+meanNumberStepsByDay
+```
+
+##### Mean number of steps taken each day excluding 0 
+```{r Mean and median number of steps taken each day, echo=TRUE}
+noZeroMean <- function(x) {
+    if (all(x==0)) 0 else mean(x[x!=0])
+}
+meanNumberWithoutZeroStepsByDay <- aggregate(Steps ~ Date, activityData, noZeroMean)
+meanNumberWithoutZeroStepsByDay
+```
+
+##### Median number of steps taken each day
+```{r Median number of steps taken each day, echo=TRUE}
+
+medianNumberStepsByDay <- aggregate(Steps ~ Date, activityData, median, na.rm = TRUE)
+medianNumberStepsByDay
+```
+
+##### Median number of steps taken each day excluding 0
+```{r Median number of steps taken each day excluding 0, echo=TRUE}
+noZeroMedian <- function(x) {
+    if (all(x==0)) 0 else median(x[x!=0])
+}
+
+medianNumberStepsWithoutZeroByDay <- aggregate(Steps ~ Date, activityData, noZeroMedian)
+medianNumberStepsWithoutZeroByDay
+```
+
+#### Time series plot of the average number of steps taken
+```{r Time series plot of the average number of steps taken, echo=TRUE}
+library(ggplot2)
+## Create plot
+g <- qplot(x = Date, y = Steps, data = meanNumberStepsByDay, group = 1)
+g + labs(x="Date", y = "Average number of steps") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_point(color="blue") + geom_line() +  geom_smooth(span = 1)
+```
+
+#### The 5-minute interval that, on average, contains the maximum number of steps
+
+##### Get the average number of stteps for each 5 minute interval 
+```{r Find average number of steps for each 5 minute interval, echo=TRUE}
+averageStepsOnInterval <- aggregate(Steps ~ Interval, activityData, mean, na.rm = TRUE)
+```
+
+##### Find the max number steps
+```{r Get interval tha thas the max numer of steps, echo=TRUE}
+intervalMaxNumberOfSteps <- averageStepsOnInterval$Interval[averageStepsOnInterval$Steps == max(averageStepsOnInterval$Steps)]
+intervalMaxNumberOfSteps
+```
+
+#### Code to describe and show a strategy for imputing missing data
+
+There are two major ways to impute missing data. They are Multiple Imputation and Maximum Likelihood. Maxium Likelihood seems to introduce less bias ot the data compare to multiple imputation. And they deal with different dataset differently such as if the msissing data is ramdom or not. 
+
+##### Let's look at how many missing data there is. 
+```{r Find out missing percentage for the columns, echo=TRUE}
+
+## Find the missing percentage
+missPercentage <- function(x){sum(is.na(x))/length(x)*100}
+
+apply(activityData,2, missPercentage)
+```
+For this project, it seems that the missing data for steps is a little more than 13%. Which is larger than recommanded 5%  for maxiumn missing data. So it is best to collect more data for steps. 
+
+For this project, we will use mice package to impute missing steps using Multiple Imputation.
+
+##### Install and include the mice library
+```{r Install mice package and look at its patten, echo=TRUE}
+## Install.packages("mice")
+library(mice)
+md.pattern(activityData)
+```
+We can see that there are 2303 rows of data are missing for Steps over 15264 rows.
+
+Another way to look at this is using VIM
+
+Reference used [Imputing missing data with r mice package](http://www.r-bloggers.com/imputing-missing-data-with-r-mice-package/ "R-Bloggers").
+
+##### Install and use VIM, plot the missing part of the data
+```{r Use VIM to check what is missing, echo=TRUE}
+## Install.packages("VIM")
+library(VIM)
+aggr_plot <- aggr(activityData, col=c('blue','red'), numbers=TRUE, sortVars=TRUE, labels=names(activityData), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+
+```
+Now, we use mice package to imputate by using predictive mean matching. There are many methods to impute missing data in the package. We are using mice.impute.pmm method here. We can use methods(mice) to see all the methods for impuation.
+
+##### Use Mice to impute the data using PMM method
+```{r using mice to impute missng data and not print them in console, echo=TRUE}
+imputedData <- mice(activityData, maxit=50,meth='pmm', seed=500, printFlag = FALSE)
+```
+Now to we have 5 sets of data to use for the imputation. Let's pick the third one.
+
+```{r Add missing data, echo = TRUE}
+completedImputedData <- complete(imputedData, 3)
+```
+Now we have a complete data set without missing data. This could introduce data bias. 
+
+#### Histogram of the total number of steps taken each day after missing values are imputed. Get their mean and median nubmer
+```{r After missing values are imputed, the histogram of the total number of steps taken each day , echo = TRUE}
+
+## Total
+totalStepsImputedByDay <- aggregate(Steps ~ Date, completedImputedData, sum)
+
+hist(totalStepsImputedByDay$Steps, xlab = "Total steps taken each day", main = "Histogram of total steps take each day after imputation")
+
+## Mean
+meanNumberStepsImputedByDay <- aggregate(Steps ~ Date, completedImputedData, mean)
+meanNumberStepsImputedByDay
+
+## Median
+medianNumberStepsImputedByDay <- aggregate(Steps ~ Date, completedImputedData, median)
+medianNumberStepsImputedByDay
+```
+
+#### Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+```{r the weekdays vs weekend for the average number of steps taken 5 minutes, echo = TRUE}
+library(timeDate)
+
+## Add a column for if the date is weekday or not
+completedImputedData$WeekDay <- isWeekday(completedImputedData$Date, wday=1:5)
+
+## Give the column values as factor of either Weekday or Weekend
+completedImputedData$WeekDay <- factor(completedImputedData$WeekDay, labels = c("Weekday", "Weekend"))
+ 
+## Aggregate data to have the average number of steps take per 5 minutes on all days.
+completeIntervalData <- aggregate(Steps ~ Interval + WeekDay, completedImputedData, mean)
+
+## Plot data user facets by factor WeekDay
+myPlot <- qplot(Interval, Steps, data=completeIntervalData, shape=WeekDay, color=WeekDay, facets = (WeekDay~ .), xlab="Interval", ylab="Average Steps") 
+
+myPlot + geom_line() + geom_smooth(method = "lm", se = TRUE)
+```
+Based on the data, the average activity is higher on the weekday than at the weekend. 
+

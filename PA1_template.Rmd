@@ -7,12 +7,18 @@ output:
 
 
 ## Loading and preprocessing the data
-
-
+```{R Read the csv data file}
+activityData <- read.csv("./activity.csv", skip = 1, sep = ",", col.names = c("Steps", "Date", "Interval"))
+```
 
 ## What is mean total number of steps taken per day?
 
+```{R Mean of total number of steps taken per day}
+totalStepsByDay <- aggregate(activityData$Steps ~ activityData$Date, activityData, sum, na.rm = TRUE)
 
+meanOfTotalStepsByDay <- mean(totalStepsByDay$`activityData$Steps`)
+
+```
 
 ## What is the average daily activity pattern?
 
